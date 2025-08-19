@@ -42,33 +42,33 @@ async function initPlayer() {
   const player = await VidstackPlayer.create({
     target: '#target',
     viewType: 'video',
-    streamType: 'live', // Changed from 'on-demand' to 'live' for live stream
-    logLevel: 'warn',
+    streamType: 'live',
+    logLevel: 'debug', // Changed to debug for better error visibility
     crossOrigin: true,
     playsInline: true,
-    title: 'OCN Movies Live',
-    src: 'https://ocnmovies-drm2-mcdn.tving.com/ocnmovies_drm/live5000.smil/manifest.mpd',
+    autoPlay: true, // Enable autoplay
+    muted: true, // Mute for autoplay to work
+    title: 'SPOT V HD Live',
+    src: 'https://qp-pldt-live-grp-05-prod.akamaized.net/out/u/cg_spotvhd.mpd',
     layout,
-    // DRM Configuration
+    // DRM Configuration - Fixed format
     drm: {
-      widevine: {
-        licenseUrl: '', // You'll need to provide the actual license server URL
-        headers: {
-          // Add any required headers for the license request
-        }
-      },
-      // Alternative: if using clearkey DRM
-      clearkey: {
-        keys: {
-          '817839de27764deb879c65c571c19226': '2b1443f33c919c89429a21259974a224'
-        }
+      clearKeys: {
+        "ec7ee27d83764e4b845c48cca31c8eef": "9c0e4191203fccb0fde34ee29999129e"
       }
-    }
+    },
+    // Additional player options to handle buffer issues
+    preferNativeHLS: false,
+    load: 'eager',
+    // Buffer configuration to prevent SourceBuffer issues
+    storage: null, // Disable storage to prevent conflicts
   });
 
-  // Add error handling
+  // Enhanced error handling
   player.addEventListener('error', (event) => {
     console.error('Player error:', event.detail);
+    console.error('Error type:', event.detail.type);
+    console.error('Error message:', event.detail.message);
   });
 
   // Add DRM-specific error handling
@@ -76,7 +76,41 @@ async function initPlayer() {
     console.error('DRM error:', event.detail);
   });
 
+  // Add media source error handling
+  player.addEventListener('source-change', (event) => {
+    console.log('Source changed:', event.detail);
+  });
+
+  // Add loading state handlers
+  player.addEventListener('can-play', () => {
+    console.log('Player can play - attempting to start playback');
+  });
+
+  player.addEventListener('waiting', () => {
+    console.log('Player is waiting for data');
+  });
+
+  player.addEventListener('playing', () => {
+    console.log('Player started playing');
+  });
+
+  player.addEventListener('stalled', () => {
+    console.log('Player stalled');
+  });
+
+  // Handle buffer-related events
+  player.addEventListener('progress', () => {
+    console.log('Loading progress');
+  });
+
   console.log('Player initialized for DASH stream with DRM');
+  
+  // Try to play after a short delay
+  setTimeout(() => {
+    player.play().catch(err => {
+      console.error('Autoplay failed:', err);
+    });
+  }, 1000);
 }
 
 initPlayer().catch(error => {
