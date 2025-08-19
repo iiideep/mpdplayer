@@ -116,14 +116,18 @@
           layout: new VidstackPlayerLayout({
             thumbnails: 'https://files.vidstack.io/sprite-fight/thumbnails.vtt',
           }),
-          // Configure DRM
-          keySystemConfig: {
-            'org.w3.clearkey': {
-              clearKeys: {
-                'nrQFDeRLSAKTLifXUIPiZg': 'FmY0xnWCPCNaSpRG-tUuTQ'
-              }
+          // Configure Clear Key DRM
+          keySystemConfig: [
+            {
+              keySystem: 'org.w3.clearkey',
+              keys: [
+                {
+                  keyId: 'nrQFDeRLSAKTLifXUIPiZg',
+                  key: 'FmY0xnWCPCNaSpRG-tUuTQ'
+                }
+              ]
             }
-          }
+          ]
         });
 
         // Event listeners
@@ -142,6 +146,18 @@
 
         player.addEventListener('drm-key-status-change', (event) => {
           console.log('DRM Key Status:', event.detail);
+        });
+
+        player.addEventListener('drm-session-created', (event) => {
+          console.log('DRM Session Created:', event.detail);
+        });
+
+        player.addEventListener('drm-session-updated', (event) => {
+          console.log('DRM Session Updated:', event.detail);
+        });
+
+        player.addEventListener('drm-session-closed', (event) => {
+          console.log('DRM Session Closed:', event.detail);
         });
 
         console.log('Player initialized successfully');
