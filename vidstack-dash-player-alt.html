@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>VidStack DASH Player with Clear Key (Alternative)</title>
+  <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
+  <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #000;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+  
+    #target {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #target video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #http-warning {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      background: #ff4444;
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      z-index: 1000;
+      display: none;
+    }
+
+    #http-warning a {
+      color: #ffcccc;
+      text-decoration: underline;
+    }
+
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 18px;
+      z-index: 999;
+    }
+
+    .error-message {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 0, 0, 0.9);
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 80%;
+      text-align: center;
+      z-index: 1001;
+      display: none;
+    }
+
+    .debug-info {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 998;
+    }
+  </style>
+</head>
+<body>
+  <div id="http-warning"></div>
+  <div id="loading">Loading player...</div>
+  <div id="error-message" class="error-message"></div>
+  <div id="debug-info" class="debug-info"></div>
+  <div id="target"></div>
+
+  <script type="module">
+    import { VidstackPlayer, VidstackPlayerLayout } from 'https://cdn.vidstack.io/player';
+
+    let player = null;
+
+    function addDebugLog(message) {
+      const debugDiv = document.getElementById('debug-info');
+      const timestamp = new Date().toLocaleTimeString();
+      debugDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+      debugDiv.scrollTop = debugDiv.scrollHeight;
+      console.log(message);
+    }
+
+    async function showError(message) {
+      const errorDiv = document.getElementById('error-message');
+      const loadingDiv = document.getElementById('loading');
+      
+      loadingDiv.style.display = 'none';
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+      
+      addDebugLog(`ERROR: ${message}`);
+    }
+
+    async function hideLoading() {
+      const loadingDiv = document.getElementById('loading');
+      loadingDiv.style.display = 'none';
+    }
+
+    // Base64 decode helper for keys
+    function base64ToArrayBuffer(base64) {
+      const binaryString = atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    async function initPlayer() {
+      try {
+        addDebugLog('Starting player initialization...');
+        
+        const target = document.getElementById('target');
+        
+        if (!target) {
+          throw new Error('Target element not found');
+        }
+
+        addDebugLog('Creating VidStack player...');
+
+        // Try different DRM configuration approaches
+        const drmConfigs = [
+          // Approach 1: Standard VidStack format
+          {
+            name: 'VidStack Standard',
+            config: {
+              keySystemConfig: {
+                'org.w3.clearkey': {
+                  clearKeys: {
+                    'nrQFDeRLSAKTLifXUIPiZg': 'FmY0xnWCPCNaSpRG-tUuTQ'
+                  }
+                }
+              }
+            }
+          },
+          // Approach 2: Array format
+          {
+            name: 'Array Format',
+            config: {
+              keySystemConfig: [
+                {
+                  keySystem: 'org.w3.clearkey',
+                  keys: [
+                    {
+                      keyId: 'nrQFDeRLSAKTLifXUIPiZg',
+                      key: 'FmY0xnWCPCNaSpRG-tUuTQ'
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          // Approach 3: EME-style configuration
+          {
+            name: 'EME Style',
+            config: {
+              keySystemConfig: {
+                'org.w3.clearkey': {
+                  serverURL: '', // Clear Key doesn't need a server
+                  httpRequestHeaders: {},
+                  clearKeys: {
+                    'nrQFDeRLSAKTLifXUIPiZg': 'FmY0xnWCPCNaSpRG-tUuTQ'
+                  }
+                }
+              }
+            }
+          }
+        ];
+
+        let playerCreated = false;
+        
+        for (const drmConfig of drmConfigs) {
+          if (playerCreated) break;
+          
+          try {
+            addDebugLog(`Trying ${drmConfig.name} configuration...`);
+            
+            player = await VidstackPlayer.create({
+              target,
+              title: 'DASH Player with Clear Key DRM',
+              src: {
+                src: 'https://media.axprod.net/TestVectors/v7-MultiDRM-SingleKey/Manifest_1080p_ClearKey.mpd',
+                type: 'application/dash+xml'
+              },
+              layout: new VidstackPlayerLayout({
+                thumbnails: 'https://files.vidstack.io/sprite-fight/thumbnails.vtt',
+              }),
+              ...drmConfig.config
+            });
+
+            addDebugLog(`${drmConfig.name} configuration successful!`);
+            playerCreated = true;
+            
+          } catch (configError) {
+            addDebugLog(`${drmConfig.name} failed: ${configError.message}`);
+            if (player) {
+              try {
+                player.destroy();
+              } catch (e) {}
+              player = null;
+            }
+          }
+        }
+
+        if (!playerCreated) {
+          throw new Error('All DRM configuration approaches failed');
+        }
+
+        // Event listeners
+        player.addEventListener('can-play', () => {
+          addDebugLog('Player ready to play');
+          hideLoading();
+        });
+
+        player.addEventListener('error', (event) => {
+          const errorMsg = event.detail?.message || event.detail || 'Unknown error';
+          addDebugLog(`Player error: ${errorMsg}`);
+          showError(`Player error: ${errorMsg}`);
+        });
+
+        player.addEventListener('loaded-metadata', () => {
+          addDebugLog('Metadata loaded');
+        });
+
+        player.addEventListener('drm-key-status-change', (event) => {
+          addDebugLog(`DRM Key Status: ${JSON.stringify(event.detail)}`);
+        });
+
+        player.addEventListener('drm-session-created', (event) => {
+          addDebugLog(`DRM Session Created: ${JSON.stringify(event.detail)}`);
+        });
+
+        player.addEventListener('drm-session-updated', (event) => {
+          addDebugLog(`DRM Session Updated: ${JSON.stringify(event.detail)}`);
+        });
+
+        player.addEventListener('drm-session-closed', (event) => {
+          addDebugLog(`DRM Session Closed: ${JSON.stringify(event.detail)}`);
+        });
+
+        // Additional debugging events
+        player.addEventListener('load-start', () => {
+          addDebugLog('Load started');
+        });
+
+        player.addEventListener('progress', () => {
+          addDebugLog('Loading progress...');
+        });
+
+        addDebugLog('Player initialized successfully');
+
+      } catch (error) {
+        addDebugLog(`Failed to initialize player: ${error.message}`);
+        showError(`Failed to initialize player: ${error.message}`);
+      }
+    }
+
+    function checkHTTPS() {
+      if (location.protocol === 'http:' && location.hostname !== 'localhost') {
+        const warning = 'This page has been loaded under HTTP. This might result in the EME APIs not being available to the player and any DRM-protected content will fail to play. ' +
+          'If you wish to test manifest URLs that require EME support, then <a href=\'https:' + 
+          window.location.href.substring(window.location.protocol.length) + 
+          '\'>reload this page under HTTPS</a>.';
+        
+        const div = document.getElementById('http-warning');
+        div.innerHTML = warning;
+        div.style.display = 'block';
+        
+        addDebugLog('WARNING: Running on HTTP - DRM may not work');
+      } else {
+        addDebugLog('Running on HTTPS - DRM should work');
+      }
+    }
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      addDebugLog('DOM loaded, starting initialization...');
+      checkHTTPS();
+      initPlayer();
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (player) {
+        addDebugLog('Cleaning up player...');
+        player.destroy();
+      }
+    });
+  </script>
+</body>
+</html>
