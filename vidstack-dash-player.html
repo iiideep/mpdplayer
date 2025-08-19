@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>vidstack DASH Live</title>
+  <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
+  <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
+  <style>
+   html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #000;
+      overflow: hidden;
+    }
+  
+   #target {
+      width: 100vw;
+      height: 100vh;
+    }
+
+   #target video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+  </style>
+</head>
+
+<body>
+<div id="target"></div>
+<script type="module">
+import { VidstackPlayer, VidstackPlayerLayout } from 'https://cdn.vidstack.io/player.core';
+
+async function initPlayer() {
+  const layout = new VidstackPlayerLayout({
+    // Remove thumbnails for DASH stream
+  });
+
+  const player = await VidstackPlayer.create({
+    target: '#target',
+    viewType: 'video',
+    streamType: 'live', // Changed from 'on-demand' to 'live' for live stream
+    logLevel: 'warn',
+    crossOrigin: true,
+    playsInline: true,
+    title: 'OCN Movies Live',
+    src: 'https://ocnmovies-drm2-mcdn.tving.com/ocnmovies_drm/live5000.smil/manifest.mpd',
+    layout,
+    // DRM Configuration
+    drm: {
+      widevine: {
+        licenseUrl: '', // You'll need to provide the actual license server URL
+        headers: {
+          // Add any required headers for the license request
+        }
+      },
+      // Alternative: if using clearkey DRM
+      clearkey: {
+        keys: {
+          '817839de27764deb879c65c571c19226': '2b1443f33c919c89429a21259974a224'
+        }
+      }
+    }
+  });
+
+  // Add error handling
+  player.addEventListener('error', (event) => {
+    console.error('Player error:', event.detail);
+  });
+
+  // Add DRM-specific error handling
+  player.addEventListener('drm-error', (event) => {
+    console.error('DRM error:', event.detail);
+  });
+
+  console.log('Player initialized for DASH stream with DRM');
+}
+
+initPlayer().catch(error => {
+  console.error('Failed to initialize player:', error);
+});
+</script>
+</body>
+</html>
