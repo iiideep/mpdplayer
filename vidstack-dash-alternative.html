@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>vidstack DASH Live</title>
+  <title>vidstack DASH Live - Alternative</title>
   <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
   <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
   <style>
@@ -39,6 +39,32 @@ async function initPlayer() {
     // Remove thumbnails for DASH stream
   });
 
+  // Custom license server function
+  const licenseRequestHandler = (request, messageType) => {
+    console.log('License request:', messageType);
+    
+    // For ClearKey, we can handle this directly
+    if (messageType === 'license-request') {
+      // Create a simple license response for ClearKey
+      const keys = {
+        "ec7ee27d83764e4b845c48cca31c8eef": "9c0e4191203fccb0fde34ee29999129e"
+      };
+      
+      // Convert to proper format for ClearKey
+      const response = JSON.stringify({
+        keys: Object.entries(keys).map(([kid, key]) => ({
+          kty: "oct",
+          kid: kid,
+          k: key
+        }))
+      });
+      
+      return Promise.resolve(new TextEncoder().encode(response));
+    }
+    
+    return Promise.reject(new Error('Unsupported message type'));
+  };
+
   const player = await VidstackPlayer.create({
     target: '#target',
     viewType: 'video',
@@ -46,24 +72,25 @@ async function initPlayer() {
     logLevel: 'debug',
     crossOrigin: true,
     playsInline: true,
-    muted: true, // Keep muted for autoplay compatibility
+    muted: true,
     title: 'SPOT V HD Live',
     src: 'https://qp-pldt-live-grp-05-prod.akamaized.net/out/u/cg_spotvhd.mpd',
     layout,
-    // DRM Configuration - Use a custom license server approach
-    drm: {
-      // Try ClearKey first (simpler approach)
-      clearkey: {
-        keys: {
-          "ec7ee27d83764e4b845c48cca31c8eef": "9c0e4191203fccb0fde34ee29999129e"
-        }
-      }
-    },
-    // Additional player options
+    // Try without DRM first to see if stream loads
+    // drm: {
+    //   clearkey: {
+    //     licenseUrl: 'data:application/json;base64,' + btoa(JSON.stringify({
+    //       keys: [{
+    //         kty: "oct",
+    //         kid: "ec7ee27d83764e4b845c48cca31c8eef",
+    //         k: "9c0e4191203fccb0fde34ee29999129e"
+    //       }]
+    //     }))
+    //   }
+    // },
     preferNativeHLS: false,
     load: 'eager',
     storage: null,
-    // Disable autoplay initially to prevent timing issues
     autoPlay: false,
   });
 
@@ -113,17 +140,12 @@ async function initPlayer() {
     console.log('Player stalled');
   });
 
-  // Handle buffer-related events
-  player.addEventListener('progress', () => {
-    console.log('Loading progress');
+  // Handle encrypted media
+  player.addEventListener('encrypted', (event) => {
+    console.log('Media is encrypted:', event.detail);
   });
 
-  // Handle DRM ready state
-  player.addEventListener('drm-session-created', () => {
-    console.log('DRM session created');
-  });
-
-  console.log('Player initialized for DASH stream with DRM');
+  console.log('Player initialized for DASH stream - testing without DRM first');
 }
 
 initPlayer().catch(error => {
