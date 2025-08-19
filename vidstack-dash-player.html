@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>VidStack DASH Player with Clear Key</title>
+  <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
+  <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #000;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+  
+    #target {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #target video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #http-warning {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      background: #ff4444;
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      z-index: 1000;
+      display: none;
+    }
+
+    #http-warning a {
+      color: #ffcccc;
+      text-decoration: underline;
+    }
+
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 18px;
+      z-index: 999;
+    }
+
+    .error-message {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 0, 0, 0.9);
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 80%;
+      text-align: center;
+      z-index: 1001;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="http-warning"></div>
+  <div id="loading">Loading player...</div>
+  <div id="error-message" class="error-message"></div>
+  <div id="target"></div>
+
+  <script type="module">
+    import { VidstackPlayer, VidstackPlayerLayout } from 'https://cdn.vidstack.io/player';
+
+    let player = null;
+
+    async function showError(message) {
+      const errorDiv = document.getElementById('error-message');
+      const loadingDiv = document.getElementById('loading');
+      
+      loadingDiv.style.display = 'none';
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+      
+      console.error('Player Error:', message);
+    }
+
+    async function hideLoading() {
+      const loadingDiv = document.getElementById('loading');
+      loadingDiv.style.display = 'none';
+    }
+
+    async function initPlayer() {
+      try {
+        const target = document.getElementById('target');
+        
+        if (!target) {
+          throw new Error('Target element not found');
+        }
+
+        // Create VidStack player
+        player = await VidstackPlayer.create({
+          target,
+          title: 'DASH Player with Clear Key DRM',
+          src: {
+            src: 'https://media.axprod.net/TestVectors/v7-MultiDRM-SingleKey/Manifest_1080p_ClearKey.mpd',
+            type: 'application/dash+xml'
+          },
+          layout: new VidstackPlayerLayout({
+            thumbnails: 'https://files.vidstack.io/sprite-fight/thumbnails.vtt',
+          }),
+          // Configure DRM
+          keySystemConfig: {
+            'org.w3.clearkey': {
+              clearKeys: {
+                'nrQFDeRLSAKTLifXUIPiZg': 'FmY0xnWCPCNaSpRG-tUuTQ'
+              }
+            }
+          }
+        });
+
+        // Event listeners
+        player.addEventListener('can-play', () => {
+          console.log('Player ready to play');
+          hideLoading();
+        });
+
+        player.addEventListener('error', (event) => {
+          showError(`Player error: ${event.detail.message || 'Unknown error'}`);
+        });
+
+        player.addEventListener('loaded-metadata', () => {
+          console.log('Metadata loaded');
+        });
+
+        player.addEventListener('drm-key-status-change', (event) => {
+          console.log('DRM Key Status:', event.detail);
+        });
+
+        console.log('Player initialized successfully');
+
+      } catch (error) {
+        console.error('Failed to initialize player:', error);
+        showError(`Failed to initialize player: ${error.message}`);
+      }
+    }
+
+    function checkHTTPS() {
+      if (location.protocol === 'http:' && location.hostname !== 'localhost') {
+        const warning = 'This page has been loaded under HTTP. This might result in the EME APIs not being available to the player and any DRM-protected content will fail to play. ' +
+          'If you wish to test manifest URLs that require EME support, then <a href=\'https:' + 
+          window.location.href.substring(window.location.protocol.length) + 
+          '\'>reload this page under HTTPS</a>.';
+        
+        const div = document.getElementById('http-warning');
+        div.innerHTML = warning;
+        div.style.display = 'block';
+      }
+    }
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      checkHTTPS();
+      initPlayer();
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (player) {
+        player.destroy();
+      }
+    });
+  </script>
+</body>
+</html>
