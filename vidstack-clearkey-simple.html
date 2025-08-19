@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vidstack ClearKey 简单示例</title>
+    <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css">
+    <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        
+        #player-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        #player {
+            width: 100%;
+            height: 450px;
+            background: #000;
+        }
+        
+        .info {
+            margin: 20px 0;
+            padding: 15px;
+            background: #333;
+            border-radius: 5px;
+        }
+        
+        .controls {
+            margin: 10px 0;
+        }
+        
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        #log {
+            background: #222;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="player-container">
+        <h1>Vidstack Player - ClearKey DRM 示例</h1>
+        
+        <div class="info">
+            <h3>当前配置:</h3>
+            <p><strong>MPD URL:</strong> <span id="current-url">https://qp-pldt-live-grp-05-prod.akamaized.net/out/u/cg_spotvhd.mpd</span></p>
+            <p><strong>Key ID:</strong> ec7ee27d83764e4b845c48cca31c8eef</p>
+            <p><strong>Key:</strong> 9c0e4191203fccb0fde34ee29999129e</p>
+        </div>
+        
+        <div id="player"></div>
+        
+        <div class="controls">
+            <button onclick="playVideo()">播放</button>
+            <button onclick="pauseVideo()">暂停</button>
+            <button onclick="reloadPlayer()">重新加载</button>
+            <button onclick="clearLog()">清除日志</button>
+        </div>
+        
+        <div class="info">
+            <h3>播放日志:</h3>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { VidstackPlayer, VidstackPlayerLayout } from 'https://cdn.vidstack.io/player.core';
+
+        let player = null;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        async function initPlayer() {
+            try {
+                log('正在初始化播放器...');
+                
+                // 创建布局
+                const layout = new VidstackPlayerLayout({
+                    // 基本布局配置
+                });
+
+                // 创建播放器
+                player = await VidstackPlayer.create({
+                    target: '#player',
+                    viewType: 'video',
+                    streamType: 'live',
+                    logLevel: 'warn',
+                    crossOrigin: true,
+                    playsInline: true,
+                    muted: true, // 静音以支持自动播放
+                    title: 'ClearKey DRM 测试',
+                    src: 'https://qp-pldt-live-grp-05-prod.akamaized.net/out/u/cg_spotvhd.mpd',
+                    layout,
+                    
+                    // ClearKey DRM 配置 - 方法1: 直接配置
+                    drm: {
+                        clearkey: {
+                            keys: {
+                                "ec7ee27d83764e4b845c48cca31c8eef": "9c0e4191203fccb0fde34ee29999129e"
+                            }
+                        }
+                    },
+                    
+                    // 播放器选项
+                    autoPlay: false,
+                    load: 'eager',
+                    storage: null
+                });
+
+                // 事件监听器
+                setupEventListeners();
+                
+                log('播放器初始化完成');
+
+            } catch (error) {
+                log(`初始化失败: ${error.message}`);
+                console.error('初始化错误:', error);
+            }
+        }
+
+        function setupEventListeners() {
+            if (!player) return;
+
+            // 基本播放事件
+            player.addEventListener('loadstart', () => log('开始加载媒体'));
+            player.addEventListener('loadedmetadata', () => log('媒体元数据已加载'));
+            player.addEventListener('loadeddata', () => log('媒体数据已加载'));
+            player.addEventListener('canplay', () => log('媒体可以播放'));
+            player.addEventListener('canplaythrough', () => log('媒体可以流畅播放'));
+            
+            // 播放状态事件
+            player.addEventListener('play', () => log('开始播放'));
+            player.addEventListener('playing', () => log('正在播放'));
+            player.addEventListener('pause', () => log('播放暂停'));
+            player.addEventListener('waiting', () => log('等待数据中...'));
+            player.addEventListener('stalled', () => log('播放停滞'));
+            
+            // DRM 相关事件
+            player.addEventListener('encrypted', (e) => {
+                log('检测到加密媒体');
+                console.log('加密信息:', e.detail);
+            });
+            
+            // 错误处理
+            player.addEventListener('error', (e) => {
+                log(`播放器错误: ${e.detail.message || e.detail}`);
+                console.error('播放器错误详情:', e.detail);
+            });
+            
+            // DRM 错误
+            player.addEventListener('drm-error', (e) => {
+                log(`DRM 错误: ${e.detail.message || e.detail}`);
+                console.error('DRM 错误详情:', e.detail);
+            });
+            
+            // 源变化
+            player.addEventListener('source-change', (e) => {
+                log('媒体源已变更');
+                console.log('源变化详情:', e.detail);
+            });
+        }
+
+        // 控制函数
+        window.playVideo = async function() {
+            if (player) {
+                try {
+                    await player.play();
+                    log('播放命令已发送');
+                } catch (error) {
+                    log(`播放失败: ${error.message}`);
+                }
+            }
+        };
+
+        window.pauseVideo = function() {
+            if (player) {
+                player.pause();
+                log('暂停命令已发送');
+            }
+        };
+
+        window.reloadPlayer = async function() {
+            log('重新加载播放器...');
+            if (player) {
+                player.destroy();
+            }
+            await initPlayer();
+        };
+
+        window.clearLog = function() {
+            document.getElementById('log').innerHTML = '';
+        };
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            log('页面加载完成，准备初始化播放器');
+            initPlayer();
+        });
+
+        // 导出到全局作用域以便调试
+        window.player = player;
+        window.log = log;
+    </script>
+</body>
+</html>

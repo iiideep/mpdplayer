@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>vidstack DASH Live</title>
+  <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
+  <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
+  <style>
+   html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #000;
+      overflow: hidden;
+    }
+  
+   #target {
+      width: 100vw;
+      height: 100vh;
+    }
+
+   #target video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+  </style>
+</head>
+
+<body>
+<div id="target"></div>
+<script type="module">
+import { VidstackPlayer, VidstackPlayerLayout } from 'https://cdn.vidstack.io/player.core';
+
+async function initPlayer() {
+  const layout = new VidstackPlayerLayout({
+    // Remove thumbnails for DASH stream
+  });
+
+  const player = await VidstackPlayer.create({
+    target: '#target',
+    viewType: 'video',
+    streamType: 'live',
+    logLevel: 'debug',
+    crossOrigin: true,
+    playsInline: true,
+    muted: true, // Keep muted for autoplay compatibility
+    title: 'SPOT V HD Live',
+    src: 'https://qp-pldt-live-grp-05-prod.akamaized.net/out/u/cg_spotvhd.mpd',
+    layout,
+    // DRM Configuration - Use a custom license server approach
+    drm: {
+      // Try ClearKey first (simpler approach)
+      clearkey: {
+        keys: {
+          "ec7ee27d83764e4b845c48cca31c8eef": "9c0e4191203fccb0fde34ee29999129e"
+        }
+      }
+    },
+    // Additional player options
+    preferNativeHLS: false,
+    load: 'eager',
+    storage: null,
+    // Disable autoplay initially to prevent timing issues
+    autoPlay: false,
+  });
+
+  // Enhanced error handling
+  player.addEventListener('error', (event) => {
+    console.error('Player error:', event.detail);
+    console.error('Error type:', event.detail.type);
+    console.error('Error message:', event.detail.message);
+  });
+
+  // Add DRM-specific error handling
+  player.addEventListener('drm-error', (event) => {
+    console.error('DRM error:', event.detail);
+  });
+
+  // Add media source error handling
+  player.addEventListener('source-change', (event) => {
+    console.log('Source changed:', event.detail);
+  });
+
+  // Add loading state handlers
+  player.addEventListener('can-play', () => {
+    console.log('Player can play - attempting to start playback');
+    // Try to play when media is ready
+    player.play().catch(err => {
+      console.error('Play failed:', err);
+    });
+  });
+
+  player.addEventListener('loadeddata', () => {
+    console.log('Media data loaded');
+  });
+
+  player.addEventListener('loadedmetadata', () => {
+    console.log('Media metadata loaded');
+  });
+
+  player.addEventListener('waiting', () => {
+    console.log('Player is waiting for data');
+  });
+
+  player.addEventListener('playing', () => {
+    console.log('Player started playing');
+  });
+
+  player.addEventListener('stalled', () => {
+    console.log('Player stalled');
+  });
+
+  // Handle buffer-related events
+  player.addEventListener('progress', () => {
+    console.log('Loading progress');
+  });
+
+  // Handle DRM ready state
+  player.addEventListener('drm-session-created', () => {
+    console.log('DRM session created');
+  });
+
+  console.log('Player initialized for DASH stream with DRM');
+}
+
+initPlayer().catch(error => {
+  console.error('Failed to initialize player:', error);
+});
+</script>
+</body>
+</html>
