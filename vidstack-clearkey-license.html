@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vidstack ClearKey 许可证服务器方式</title>
+    <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css">
+    <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        #player {
+            width: 100%;
+            height: 500px;
+            margin: 20px 0;
+            background: #000;
+        }
+        
+        .config {
+            background: #333;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .log {
+            background: #222;
+            padding: 15px;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        .method {
+            border: 1px solid #555;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        
+        .method h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Vidstack ClearKey - 许可证服务器方式</h1>
+        
+        <div class="config">
+            <h2>当前配置</h2>
+            <p><strong>MPD:</strong> https://qp-pldt-live-grp-05-prod.akamaized.net/out/u/cg_spotvhd.mpd</p>
+            <p><strong>Key ID:</strong> ec7ee27d83764e4b845c48cca31c8eef</p>
+            <p><strong>Key:</strong> 9c0e4191203fccb0fde34ee29999129e</p>
+        </div>
+
+        <div id="player"></div>
+        
+        <div class="config">
+            <h2>测试不同的 DRM 配置方法</h2>
+            <button onclick="testMethod1()">方法1: Base64 Data URL</button>
+            <button onclick="testMethod2()">方法2: 自定义许可证处理</button>
+            <button onclick="testMethod3()">方法3: Widevine 模拟</button>
+            <button onclick="testMethod4()">方法4: 无 DRM 测试</button>
+            <button onclick="clearLog()">清除日志</button>
+        </div>
+        
+        <div class="config">
+            <div class="method">
+                <h3>方法说明:</h3>
+                <p><strong>方法1:</strong> 使用 Base64 编码的 Data URL 作为许可证服务器</p>
+                <p><strong>方法2:</strong> 使用自定义许可证请求处理函数</p>
+                <p><strong>方法3:</strong> 尝试 Widevine DRM 配置</p>
+                <p><strong>方法4:</strong> 测试不使用 DRM 是否可以播放</p>
+            </div>
+        </div>
+        
+        <div class="config">
+            <h2>播放日志</h2>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { VidstackPlayer, VidstackPlayerLayout } from 'https://cdn.vidstack.io/player.core';
+
+        let currentPlayer = null;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.textContent += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function destroyCurrentPlayer() {
+            if (currentPlayer) {
+                try {
+                    currentPlayer.destroy();
+                } catch (e) {
+                    log(`销毁播放器时出错: ${e.message}`);
+                }
+                currentPlayer = null;
+            }
+        }
+
+        async function createPlayer(drmConfig, description) {
+            try {
+                log(`\n=== ${description} ===`);
+                destroyCurrentPlayer();
+                
+                const layout = new VidstackPlayerLayout();
+                
+                const playerConfig = {
+                    target: '#player',
+                    viewType: 'video',
+                    streamType: 'live',
+                    logLevel: 'debug',
+                    crossOrigin: true,
+                    playsInline: true,
+                    muted: true,
+                    title: 'ClearKey DRM 测试',
+                    src: 'https://qp-pldt-live-grp-05-prod.akamaized.net/out/u/cg_spotvhd.mpd',
+                    layout,
+                    autoPlay: false,
+                    load: 'eager',
+                    storage: null,
+                    preferNativeHLS: false
+                };
+
+                if (drmConfig) {
+                    playerConfig.drm = drmConfig;
+                    log(`DRM 配置: ${JSON.stringify(drmConfig, null, 2)}`);
+                }
+
+                log('正在创建播放器...');
+                currentPlayer = await VidstackPlayer.create(playerConfig);
+                
+                setupEventListeners();
+                log('播放器创建成功');
+
+            } catch (error) {
+                log(`播放器创建失败: ${error.message}`);
+                console.error('详细错误:', error);
+            }
+        }
+
+        function setupEventListeners() {
+            if (!currentPlayer) return;
+
+            currentPlayer.addEventListener('loadstart', () => log('📥 开始加载'));
+            currentPlayer.addEventListener('loadedmetadata', () => log('📋 元数据已加载'));
+            currentPlayer.addEventListener('loadeddata', () => log('📊 数据已加载'));
+            currentPlayer.addEventListener('canplay', () => {
+                log('✅ 可以播放 - 尝试自动播放');
+                currentPlayer.play().catch(err => log(`自动播放失败: ${err.message}`));
+            });
+            
+            currentPlayer.addEventListener('play', () => log('▶️ 开始播放'));
+            currentPlayer.addEventListener('playing', () => log('🎬 正在播放'));
+            currentPlayer.addEventListener('pause', () => log('⏸️ 播放暂停'));
+            currentPlayer.addEventListener('waiting', () => log('⏳ 等待缓冲'));
+            currentPlayer.addEventListener('stalled', () => log('🚫 播放停滞'));
+            
+            currentPlayer.addEventListener('encrypted', (e) => {
+                log('🔒 检测到加密媒体');
+                console.log('加密详情:', e.detail);
+            });
+            
+            currentPlayer.addEventListener('error', (e) => {
+                log(`❌ 播放器错误: ${e.detail.message || JSON.stringify(e.detail)}`);
+                console.error('错误详情:', e.detail);
+            });
+            
+            currentPlayer.addEventListener('drm-error', (e) => {
+                log(`🔐 DRM 错误: ${e.detail.message || JSON.stringify(e.detail)}`);
+                console.error('DRM 错误详情:', e.detail);
+            });
+        }
+
+        // 方法1: 使用 Base64 编码的 Data URL
+        window.testMethod1 = async function() {
+            const clearKeyLicense = {
+                keys: [{
+                    kty: "oct",
+                    kid: "ec7ee27d83764e4b845c48cca31c8eef",
+                    k: "9c0e4191203fccb0fde34ee29999129e"
+                }]
+            };
+            
+            const licenseBase64 = btoa(JSON.stringify(clearKeyLicense));
+            const dataUrl = `data:application/json;base64,${licenseBase64}`;
+            
+            const drmConfig = {
+                clearkey: {
+                    licenseUrl: dataUrl
+                }
+            };
+
+            await createPlayer(drmConfig, '方法1: Base64 Data URL');
+        };
+
+        // 方法2: 使用自定义许可证处理
+        window.testMethod2 = async function() {
+            const drmConfig = {
+                clearkey: {
+                    licenseUrl: 'custom://clearkey-license',
+                    licenseRequestHeaders: {
+                        'Content-Type': 'application/json'
+                    },
+                    // 自定义许可证请求处理
+                    onLicenseRequest: (request) => {
+                        log('🔑 处理许可证请求');
+                        
+                        const clearKeyLicense = {
+                            keys: [{
+                                kty: "oct",
+                                kid: "ec7ee27d83764e4b845c48cca31c8eef",
+                                k: "9c0e4191203fccb0fde34ee29999129e"
+                            }]
+                        };
+                        
+                        return Promise.resolve(JSON.stringify(clearKeyLicense));
+                    }
+                }
+            };
+
+            await createPlayer(drmConfig, '方法2: 自定义许可证处理');
+        };
+
+        // 方法3: 尝试 Widevine 配置
+        window.testMethod3 = async function() {
+            const drmConfig = {
+                widevine: {
+                    licenseUrl: 'data:application/json;base64,' + btoa(JSON.stringify({
+                        keys: [{
+                            kty: "oct",
+                            kid: "ec7ee27d83764e4b845c48cca31c8eef",
+                            k: "9c0e4191203fccb0fde34ee29999129e"
+                        }]
+                    }))
+                }
+            };
+
+            await createPlayer(drmConfig, '方法3: Widevine 模拟');
+        };
+
+        // 方法4: 不使用 DRM
+        window.testMethod4 = async function() {
+            await createPlayer(null, '方法4: 无 DRM 测试');
+        };
+
+        window.clearLog = function() {
+            document.getElementById('log').textContent = '';
+        };
+
+        // 页面加载时的初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            log('页面加载完成，请选择一个方法进行测试');
+        });
+    </script>
+</body>
+</html>
